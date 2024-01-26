@@ -1,0 +1,72 @@
+training all
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.9145251396648044
+training ac
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.6159737417943107
+training pc
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.841995841995842
+training all
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.9252094972067039
+training ac
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.6323851203501094
+training pc
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.8711018711018711
+training all
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.9344972067039106
+training ac
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.6462436177972283
+training pc
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.8991683991683992
+training all
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.9447625698324023
+training ac
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.674325309992706
+training pc
+Test Size: 0.2
+Crossvalidation: 10
+training random forest classifier
+Fitting 10 folds for each of 28 candidates, totalling 280 fits
+Accuracy: 0.9272349272349273
