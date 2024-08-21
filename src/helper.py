@@ -18,13 +18,18 @@ class Constants:
 
 class ImageProcessing:
     @staticmethod
-    def get_colors(img: Image) -> List[Tuple[int, int, int]]:
+    def get_colors(img: Image, color_space='RGB') -> List[Tuple[int, int, int]]:
         """
         Returns a list of all the image's colors.
         """
         w, h = img.size
-        return [color for count, color in img.convert('RGB').getcolors(w * h)]
-    
+        if color_space == 'RGB':
+            return [color for count, color in img.convert('RGB').getcolors(w * h)]
+        elif color_space == 'LAB':
+            return [color for count, color in img.convert('LAB').getcolors(w * h)]
+        else:
+            raise ValueError(f'Invalid color space {color_space}. Choose either "RGB" or "LAB"')    
+        
     def clamp(color: Tuple[int, int, int], min_v: int, max_v: int) -> Tuple[int, int, int]:
         """
         Clamps a color such that the value (lightness) is between min_v and max_v
@@ -33,6 +38,15 @@ class ImageProcessing:
         min_v, max_v = map(ColorProcessing.down_scale, (min_v, max_v))
         v = min(max(min_v ,v), max_v)
         return tuple(map(ColorProcessing.up_scale, hsv_to_rgb(h, s, v)))
+    
+    @staticmethod
+    def clamp_lab(color: Tuple[int, int, int], min_l: int, max_l: int) -> Tuple[int, int, int]:
+        '''
+        clamp method for cielab color space
+        '''
+        l, a, b = color
+        l = max(min(l, max_l), min_l)
+        return (l, a, b)
     
     @staticmethod
     def load_and_convert_image(img_path: str, color_scheme='RGB') -> Tuple[np.array, np.array]:
@@ -65,7 +79,34 @@ class ColorProcessing:
         hsvs = [rgb_to_hsv(*map(ColorProcessing.down_scale, color)) for color in colors]
         hsvs.sort(key=lambda t: t[0])
         return [tuple(map(ColorProcessing.up_scale, hsv_to_rgb(*hsv))) for hsv in hsvs]
+    
+    @staticmethod
+    def order_lab_colors(colors: List[Tuple[int, int, int]]) -> List[Tuple[int, int, int]]:
+        """
+        Orders LAB colors based on their position in the LAB color space.
+        
+        Args:
+        colors (List[Tuple[int, int, int]]): List of LAB color tuples.
+        
+        Returns:
+        List[Tuple[int, int, int]]: Sorted list of LAB color tuples.
+        """
+        def lab_to_polar(lab):
+            L, a, b = lab
+            C = np.sqrt(a**2 + b**2)  # Chroma
+            h = np.arctan2(b, a)  # Hue angle in radians
+            return L, C, h
 
+        def sort_key(lab):
+            L, C, h = lab_to_polar(lab)
+            # Normalize L to be between 0 and 1
+            L_norm = L / 100.0
+            # Convert hue to be between 0 and 1
+            h_norm = (h + np.pi) / (2 * np.pi)
+            # Sort primarily by hue, then by lightness, then by chroma
+            return (h_norm, L_norm, C)
+
+        return sorted(colors, key=sort_key)
 
 class ImageAnalysis:
     @staticmethod
@@ -81,8 +122,9 @@ class ImageAnalysis:
     @staticmethod
     def get_dominant_colors(image_path: Union[str, Path],
                             num_colors: int = 8,
-                            min_v: int = 0,
-                            max_v: int = 256,
+                            color_space: str = 'RGB',
+                            min_value: int = 0,
+                            max_value: int = 256,
                             order_colors: bool = True,
                             return_clusters: bool = False) -> Union[np.array, Tuple[np.array, KMeans]]:
         """
@@ -91,6 +133,7 @@ class ImageAnalysis:
         Args:
             image_path (Union[str, Path]): Path to the image file.
             num_colors (int, optional): Number of dominant colors to return. Defaults to 8.
+            color_space (str, optional): Color space to use ('RGB' or 'LAB'). Defaults to 'RGB'.
             min_v (int, optional): Minimum value to clamp colors to. Defaults to 0.
             max_v (int, optional): Maximum value to clamp colors to. Defaults to 256.
             order_colors (bool, optional): Whether to order colors by hue. Defaults to True.
@@ -100,31 +143,72 @@ class ImageAnalysis:
             Union[np.array, Tuple[np.array, KMeans]]: Dominant colors in the image, and optionally the color clusters.
         """       
 
-        image = Image.open(image_path)
-        image.thumbnail(Constants.THUMB_SIZE)
-        colors = ImageProcessing.get_colors(image)
+        # image = Image.open(image_path)
+        # image.thumbnail(Constants.THUMB_SIZE)
+        # colors = ImageProcessing.get_colors(image)
 
-        # Adjust the value of each color based on the chosen min and max values
-        clamped_colors = [ImageProcessing.clamp(color, min_v, max_v) for color in colors]
-        clamped_colors_array = np.array(clamped_colors).astype(float)
+        # # Adjust the value of each color based on the chosen min and max values
+        # clamped_colors = [ImageProcessing.clamp(color, min_v, max_v) for color in colors]
+        # clamped_colors_array = np.array(clamped_colors).astype(float)
 
-        # Perform KMeans clustering to find the dominant colors
-        kmeans_model = KMeans(n_clusters=num_colors).fit(clamped_colors_array)
-        dominant_colors = kmeans_model.cluster_centers_
+        # # Perform KMeans clustering to find the dominant colors
+        # kmeans_model = KMeans(n_clusters=num_colors).fit(clamped_colors_array)
+        # dominant_colors = kmeans_model.cluster_centers_
 
+        # if order_colors:
+        #     dominant_colors = ColorProcessing.order_by_hue(dominant_colors)
+
+        # if return_clusters:
+        #     return dominant_colors, kmeans_model
+        # else:
+        #     return dominant_colors
+
+                # Load the image
+        image = cv2.imread(str(image_path))
+        
+        # Convert to the desired color space
+        if color_space == 'RGB':
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        elif color_space == 'LAB':
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        else:
+            raise ValueError(f"Unsupported color space: {color_space}. Use 'RGB' or 'LAB'.")
+
+        # Reshape the image to be a list of pixels
+        pixels = image.reshape((-1, 3))
+
+        # Perform color clamping
+        if color_space == 'RGB':
+            pixels = np.clip(pixels, min_value, max_value)
+        elif color_space == 'LAB':
+            # For LAB, we only clamp the L channel
+            pixels[:, 0] = np.clip(pixels[:, 0], min_value, max_value)
+
+        # Perform KMeans clustering
+        kmeans = KMeans(n_clusters=num_colors, n_init=10)
+        kmeans.fit(pixels)
+        dominant_colors = kmeans.cluster_centers_
+
+        # Order colors if requested
         if order_colors:
-            dominant_colors = ColorProcessing.order_by_hue(dominant_colors)
+            if color_space == 'RGB':
+                dominant_colors = ColorProcessing.order_by_hue(dominant_colors)
+            elif color_space == 'LAB':
+                dominant_colors = ColorProcessing.order_lab_colors(dominant_colors)
+
+        # Convert back to uint8
+        dominant_colors = np.uint8(dominant_colors)
 
         if return_clusters:
-            return dominant_colors, kmeans_model
+            return dominant_colors, kmeans
         else:
             return dominant_colors
         
     
     @staticmethod
     def plot_color_histogram(img_path: str, fig_path: str, title: str = '', n_bins: int = 256, 
-                             n_dominant_colors: int = 8, color_scheme: str ='RGB'):
-        converted_img, channels = ImageProcessing.load_and_convert_image(img_path, color_scheme)
+                             n_dominant_colors: int = 8, color_space: str ='RGB'):
+        converted_img, channels = ImageProcessing.load_and_convert_image(img_path, color_space)
 
         fig = plt.figure(figsize=(5, 7))
         #fig.suptitle(title, fontsize=20)
@@ -135,7 +219,12 @@ class ImageAnalysis:
         ax1 = plt.subplot(gs[0])
         ax1.axis("off")
         ax1.set_title('Original Image')
-        ax1.imshow(converted_img)
+        if color_space = 'RGB':
+            ax1.imshow(converted_img)
+        else: #LAB
+            # Convert LAB to RGB for Display
+            rgb_img = cv2.cvtColor(converted_img, cv2.COLOR_LAB2RGB)
+            ax1.imshow(rgb_img)
 
         # # Plot RGB histogram
         # colors = ("b", "g", "r")
@@ -151,8 +240,15 @@ class ImageAnalysis:
         #     ax2.set_xlim([0, n_bins])
         
         # Plot dominant colors
-        image_array, dominant_colors = ImageAnalysis.get_dominant_colors(img_path, n_dominant_colors, return_clusters=True)
+        image_array, dominant_colors = ImageAnalysis.get_dominant_colors(img_path, n_dominant_colors, color_space=color_space, return_clusters=True)
         bar_hist = calculate_normalized_histogram(dominant_colors)
+
+        if color_space == 'LAB':
+            # Convert LAB colors to RGB for display
+            display_colors = [cv2.cvtColor(np.uint8([[color]]), cv2.COLOR_LAB2RGB)[0][0] for color in dominant_colors.cluster_centers_]
+        else:
+            display_colors = dominant_colors.cluster_centers_
+        
         bar = ColorBar.create_relative_color_bar(bar_hist, dominant_colors.cluster_centers_)
 
         
@@ -254,13 +350,14 @@ def plot_feature_colors(d, title, figures_path, verbose=False):
 
 class DominantColorAnalysis:
     def __init__(self, datapath: Union[str, Path], img_list: List[str], 
-                 title: str, output: str, n_sample: int, n_colors: int):
+                 title: str, output: str, n_sample: int, n_colors: int,  color_space: str = 'RGB'):
         self.datapath = datapath
         self.img_list = img_list
         self.title = title
         self.output = output
         self.n_sample = n_sample
         self.n_colors = n_colors
+        self.color_space = color_space
 
     def validate_sample_size(self):
         if self.n_sample > len(self.img_list):
@@ -271,7 +368,12 @@ class DominantColorAnalysis:
         all_arrays = []
         self.img_list = [str(self.datapath) + str(x) for x in self.img_list]
         for img in self.img_list:
-            image_array = ImageAnalysis.get_dominant_colors(img, self.n_colors, return_clusters=False)
+            image = cv2.imread(img)
+            if self.color_space == 'LAB':
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+            else:  # RGB
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image_array = image.reshape((-1, 3))
             all_arrays.append(image_array)
         return np.concatenate(all_arrays, axis=0)
     
@@ -279,6 +381,13 @@ class DominantColorAnalysis:
         df = pd.DataFrame(all_images)
         y = KMeans(n_clusters=self.n_colors).fit(df)
         hist = calculate_normalized_histogram(y)
+        if self.color_space == 'LAB':
+            # Convert LAB colors to RGB for display
+            display_colors = [cv2.cvtColor(np.uint8([[color]]), cv2.COLOR_LAB2RGB)[0][0] for color in kmeans.cluster_centers_]
+        else:
+            display_colors = y.cluster_centers_
+        
+        bar = self.create_color_bar(hist, display_colors)
         bar = ColorBar.create_relative_color_bar(hist, y.cluster_centers_)
         return y.cluster_centers_, bar
 
@@ -289,6 +398,22 @@ class DominantColorAnalysis:
         plt.imshow(bar)
         plt.savefig(self.output, dpi=300, bbox_inches='tight')
         plt.show()
+
+
+    def interpret_results(self, cluster_centers):
+        if self.color_space == 'LAB':
+            print("Dominant colors in LAB space:")
+            for i, color in enumerate(cluster_centers):
+                l, a, b = color
+                print(f"Color {i+1}: L={l:.2f}, a={a:.2f}, b={b:.2f}")
+                print(f"  Lightness: {'Dark' if l < 50 else 'Light'}")
+                print(f"  a* axis: {'Green' if a < 0 else 'Red'}")
+                print(f"  b* axis: {'Blue' if b < 0 else 'Yellow'}")
+        else:  # RGB
+            print("Dominant colors in RGB space:")
+            for i, color in enumerate(cluster_centers):
+                r, g, b = color
+                print(f"Color {i+1}: R={r:.2f}, G={g:.2f}, B={b:.2f}")
 
     def run(self):
         self.validate_sample_size()
@@ -338,6 +463,51 @@ def calc_bucket(color: np.array, shared_pixels_per_dim: int) -> int:
     """
     return np.dot(color // (256 / shared_pixels_per_dim), [1, shared_pixels_per_dim, shared_pixels_per_dim**2]).astype(int)
 
+
+def calc_bucket_lab(color: np.ndarray, l_bins: int = 10, ab_bins: int = 10) -> int:
+    """
+    Calculate bucket for a given LAB color.
+
+    Args:
+    color (np.ndarray): LAB color values (L, a, b).
+    l_bins (int): Number of bins for L channel. Default is 10.
+    ab_bins (int): Number of bins for a and b channels. Default is 10.
+
+    Returns:
+    int: Bucket number for the given color.
+    """
+    L, a, b = color
+
+    # L ranges from 0 to 100
+    L_bucket = int(L * l_bins / 100)
+
+    # a and b range from -128 to 127
+    a_bucket = int((a + 128) * ab_bins / 256)
+    b_bucket = int((b + 128) * ab_bins / 256)
+
+    # Ensure buckets are within range
+    L_bucket = max(0, min(L_bucket, l_bins - 1))
+    a_bucket = max(0, min(a_bucket, ab_bins - 1))
+    b_bucket = max(0, min(b_bucket, ab_bins - 1))
+
+    # Calculate unique bucket number
+    return L_bucket * (ab_bins ** 2) + a_bucket * ab_bins + b_bucket
+
+def get_lab_bucket_ranges(l_bins: int = 10, ab_bins: int = 10) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Get the range of values for each bucket in LAB space.
+
+    Args:
+    l_bins (int): Number of bins for L channel. Default is 10.
+    ab_bins (int): Number of bins for a and b channels. Default is 10.
+
+    Returns:
+    Tuple[np.ndarray, np.ndarray, np.ndarray]: Arrays of bucket ranges for L, a, and b channels.
+    """
+    L_ranges = np.linspace(0, 100, l_bins + 1)
+    ab_ranges = np.linspace(-128, 128, ab_bins + 1)
+    
+    return L_ranges, ab_ranges, ab_ranges
 
 def process_colors(colors: np.array, percentages: np.array, n_pixels_dim: int) -> Dict[Any, Dict[str, Any]]:
     """
