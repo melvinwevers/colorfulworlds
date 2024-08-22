@@ -1,20 +1,27 @@
-import cv2
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
-import random
 import os
+import random
+from pathlib import Path
+from typing import List, Tuple, Dict, Union, Any
+
+import cv2
+import numpy as np
 import pandas as pd
 from PIL import Image
-from pathlib import Path
 from sklearn.cluster import KMeans
 from colorsys import rgb_to_hsv, hsv_to_rgb
-from typing import Union, List, Tuple, Any, Dict
+
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+
 
 class Constants:
     THUMB_SIZE = (200, 200)
     SCALE = 256.0
     BAR_DIMENSIONS = (50, 300, 3)
+    MIN_RGB_VALUE = 0 
+    MAX_RGB_VALUE = 256
+    MIN_LAB_L_VALUE = 0
+    MAX_LAB_L_VALUE = 100
 
 class ImageProcessing:
     @staticmethod
@@ -360,8 +367,35 @@ def plot_feature_colors(d, title, figures_path, verbose=False):
 
 
 class DominantColorAnalysis:
+    """
+     A class for analyzing dominant colors in a collection of images.
+
+    This class provides functionality to process multiple images, extract their dominant colors,
+    and visualize the results. It supports both RGB and LAB color spaces.
+
+    Attributes:
+        datapath (Union[str, Path]): The path to the directory containing the images.
+        img_list (List[str]): A list of image filenames to process.
+        title (str): The title for the output visualization.
+        output (str): The path where the output visualization will be saved.
+        n_sample (int): The number of images to sample from the img_list.
+        n_colors (int): The number of dominant colors to extract from each image.
+        color_space (str): The color space to use for analysis ('RGB' or 'LAB').
+    """
     def __init__(self, datapath: Union[str, Path], img_list: List[str], 
                  title: str, output: str, n_sample: int, n_colors: int,  color_space: str = 'RGB'):
+        """
+        Initialize the DominantColorAnalysis object.
+
+        Args:
+            datapath (Union[str, Path]): The path to the directory containing the images.
+            img_list (List[str]): A list of image filenames to process.
+            title (str): The title for the output visualization.
+            output (str): The path where the output visualization will be saved.
+            n_sample (int): The number of images to sample from the img_list.
+            n_colors (int): The number of dominant colors to extract from each image.
+            color_space (str, optional): The color space to use for analysis. Defaults to 'RGB'.
+        """
         self.datapath = datapath
         self.img_list = img_list
         self.title = title
@@ -371,11 +405,26 @@ class DominantColorAnalysis:
         self.color_space = color_space
 
     def validate_sample_size(self):
+        """
+        Validate that the sample size is not larger than the number of available images.
+
+        Raises:
+            ValueError: If n_sample is larger than the number of images in img_list.
+        """
         if self.n_sample > len(self.img_list):
             raise ValueError(f'n_sample larger than list of images. List of images is: {len(self.img_list)}')
         self.img_list = random.sample(self.img_list, self.n_sample)
 
-    def get_image_colors(self):
+    def get_image_colors(self) -> np.ndarray:
+              """
+        Extract color information from all sampled images.
+
+        This method loads each image, converts it to the specified color space,
+        and extracts color information.
+
+        Returns:
+            np.ndarray: A 2D array where each row represents a pixel and each column represents a color channel.
+        """
         all_arrays = []
         self.img_list = [str(self.datapath) + str(x) for x in self.img_list]
         for img in self.img_list:
@@ -388,7 +437,18 @@ class DominantColorAnalysis:
             all_arrays.append(image_array)
         return np.concatenate(all_arrays, axis=0)
     
-    def analyze_colors(self, all_images):
+    def analyze_colors(self, all_images: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Perform color analysis on the extracted color information.
+
+        This method uses K-means clustering to find dominant colors and creates a color bar visualization.
+
+        Args:
+            all_images (np.ndarray): A 2D array of color information from all processed images.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: A tuple containing the cluster centers (dominant colors) and the color bar visualization.
+        """
         df = pd.DataFrame(all_images)
         y = KMeans(n_clusters=self.n_colors).fit(df)
         hist = calculate_normalized_histogram(y)
@@ -398,11 +458,17 @@ class DominantColorAnalysis:
         else:
             display_colors = y.cluster_centers_
         
-        bar = self.create_color_bar(hist, display_colors)
+        # bar = self.create_color_bar(hist, display_colors)
         bar = ColorBar.create_relative_color_bar(hist, y.cluster_centers_)
         return y.cluster_centers_, bar
 
     def save_and_display_results(self, bar):
+        """
+        Save the color bar visualization and display it.
+
+        Args:
+            bar (np.ndarray): The color bar visualization to save and display.
+        """
         plt.figure()
         plt.axis("off")
         plt.title(self.title)
@@ -412,6 +478,14 @@ class DominantColorAnalysis:
 
 
     def interpret_results(self, cluster_centers):
+        """
+        Interpret and print the results of the color analysis.
+
+        This method prints out information about each dominant color found in the analysis.
+
+        Args:
+            cluster_centers (np.ndarray): The array of dominant colors (cluster centers) from the analysis.
+        """
         if self.color_space == 'LAB':
             print("Dominant colors in LAB space:")
             for i, color in enumerate(cluster_centers):
@@ -427,6 +501,15 @@ class DominantColorAnalysis:
                 print(f"Color {i+1}: R={r:.2f}, G={g:.2f}, B={b:.2f}")
 
     def run(self):
+        """
+        Run the full dominant color analysis process.
+
+        This method orchestrates the entire analysis process, from validating the sample size
+        to saving and displaying the results.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: A tuple containing the cluster centers (dominant colors) and all processed image data.
+        """
         self.validate_sample_size()
         all_images = self.get_image_colors()
         cluster_centers, bar = self.analyze_colors(all_images)
@@ -435,7 +518,7 @@ class DominantColorAnalysis:
     
 
 
-def dominant_color_collection(datapath, img_list, title, output, n_sample, n_colors):
+def dominant_color_collection(datapath, img_list, title, output, n_sample, n_colors, color_space):
     allArrays = []
     img_list = [str(datapath) + str(x) for x in img_list]
     if n_sample > len(img_list):
@@ -445,7 +528,7 @@ def dominant_color_collection(datapath, img_list, title, output, n_sample, n_col
         img_list = random.sample(img_list, n_sample)
         
     for _ in img_list:
-        image_array = colorz_in_bucket(_, n_colors, cluster=False)
+        image_array = colorz_in_bucket(_, n_colors, cluster=False, color_space)
         allArrays.append(image_array)
 
 
@@ -475,14 +558,13 @@ def calc_bucket(color: np.array, shared_pixels_per_dim: int) -> int:
     return np.dot(color // (256 / shared_pixels_per_dim), [1, shared_pixels_per_dim, shared_pixels_per_dim**2]).astype(int)
 
 
-def calc_bucket_lab(color: np.ndarray, l_bins: int = 10, ab_bins: int = 10) -> int:
+def calc_bucket_lab(color: np.ndarray, shared_pixels_per_dim: int) -> int:
     """
     Calculate bucket for a given LAB color.
 
     Args:
     color (np.ndarray): LAB color values (L, a, b).
-    l_bins (int): Number of bins for L channel. Default is 10.
-    ab_bins (int): Number of bins for a and b channels. Default is 10.
+    shared_pixels_per_dim (int): Number of divisions per dimension.
 
     Returns:
     int: Bucket number for the given color.
@@ -490,19 +572,19 @@ def calc_bucket_lab(color: np.ndarray, l_bins: int = 10, ab_bins: int = 10) -> i
     L, a, b = color
 
     # L ranges from 0 to 100
-    L_bucket = int(L * l_bins / 100)
+    L_bucket = int(L * shared_pixels_per_dim / 100)
 
     # a and b range from -128 to 127
-    a_bucket = int((a + 128) * ab_bins / 256)
-    b_bucket = int((b + 128) * ab_bins / 256)
+    a_bucket = int((a + 128) * shared_pixels_per_dim / 256)
+    b_bucket = int((b + 128) * shared_pixels_per_dim / 256)
 
     # Ensure buckets are within range
-    L_bucket = max(0, min(L_bucket, l_bins - 1))
-    a_bucket = max(0, min(a_bucket, ab_bins - 1))
-    b_bucket = max(0, min(b_bucket, ab_bins - 1))
+    L_bucket = max(0, min(L_bucket, shared_pixels_per_dim - 1))
+    a_bucket = max(0, min(a_bucket, shared_pixels_per_dim - 1))
+    b_bucket = max(0, min(b_bucket, shared_pixels_per_dim - 1))
 
     # Calculate unique bucket number
-    return L_bucket * (ab_bins ** 2) + a_bucket * ab_bins + b_bucket
+    return L_bucket * (shared_pixels_per_dim ** 2) + a_bucket * shared_pixels_per_dim + b_bucket
 
 def get_lab_bucket_ranges(l_bins: int = 10, ab_bins: int = 10) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -520,20 +602,17 @@ def get_lab_bucket_ranges(l_bins: int = 10, ab_bins: int = 10) -> Tuple[np.ndarr
     
     return L_ranges, ab_ranges, ab_ranges
 
-def process_colors(colors: np.array, percentages: np.array, n_pixels_dim: int) -> Dict[Any, Dict[str, Any]]:
-    """
-    Proces the colors and percentages (taken from weights in histogram) into a dictionary
-    """
+def process_colors(colors: np.array, percentages: np.array, n_pixels_dim: int, color_space: str) -> Dict[Any, Dict[str, Any]]:
     result = {}
     for color, perc in zip(colors, percentages):
-        num_bucket = calc_bucket(color, n_pixels_dim)
-        result.setdefault(num_bucket, {'perc': 0, 'color': 0})
+        num_bucket = calc_bucket_lab(color, n_pixels_dim) if color_space == 'LAB' else calc_bucket(color, n_pixels_dim)
+        result.setdefault(num_bucket, {'perc': 0, 'color': np.zeros(3)})
         result[num_bucket]['perc'] += perc
         result[num_bucket]['color'] += color
     return result
 
-def colorz_in_bucket(data_path: str, x: str, n_colors: int = 16, n_pixels_dim: int = 4, color_space: str,
-                     min_v: int = 0, max_v: int = 256, thumb_size: tuple = Constants.THUMB_SIZE, debug: bool = False) -> Dict[str, Any]:
+def colorz_in_bucket(data_path: str, x: str, color_space: str, n_colors: int = 16, n_pixels_dim: int = 4,
+                     min_v: int = 0, max_v: int = 256, min_l: int = 0, max_l: int = 100, thumb_size: tuple = Constants.THUMB_SIZE, debug: bool = False) -> Dict[str, Any]:
     """
     Get the n most dominant colors of an image and categorize them into buckets.
     """
@@ -555,11 +634,19 @@ def colorz_in_bucket(data_path: str, x: str, n_colors: int = 16, n_pixels_dim: i
         hist = hist.astype("float")
         hist /= hist.sum()
 
-        color_dict = process_colors(clusters.cluster_centers_, hist, n_pixels_dim)
+        color_dict = process_colors(clusters.cluster_centers_,
+                                    hist,
+                                    n_pixels_dim,
+                                    color_space)
         color_dict['img'] = x
         return color_dict
     
+    except FileNotFoundError:
+        print(f"Image file not found: {x}")
+    except Image.UnidentifiedImageError:
+        print(f"Cannot identify image file: {x}")
     except Exception as e:
         if debug:
-            print(f'Failed to process image {x}: e')
+            print(f"Failed to process image {x}: {str(e)}")
             raise e
+    return {}  # Return empty dict if processing fails

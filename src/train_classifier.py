@@ -5,10 +5,12 @@
 import argparse
 import joblib
 import pickle
+import yaml
 from pathlib import Path
 import sys
 sys.path.insert(0, '../src/')
 from helper import *
+from calculate_buckets import prepare_meta_data
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
@@ -19,8 +21,23 @@ from shap import TreeExplainer, summary_plot, decision_plot
 
 from typing import Dict, Any
 
+
 class Classifier:
-    def __init__(self, model_path, data_path, output_path, figures_path, test_size, cv, method):
+    """A class for training and evaluating image classification models."""
+    def __init__(self, model_path, data_path, output_path, figures_path, test_size, cv, method, config_path):
+        """
+        Initialize the Classifier.
+
+        Args:
+            model_path (str): Path to the model file.
+            data_path (str): Path to the data directory.
+            output_path (str): Path to save output files.
+            figures_path (str): Path to save figure files.
+            test_size (float): Proportion of the dataset to include in the test split.
+            cv (int): Number of cross-validation folds.
+            method (str): Classification method to use.
+            config_path (str): Path to config file detailing which countries to use.
+        """
         self.model_path = model_path
         self.data_path = data_path
         self.output_path = output_path
@@ -28,25 +45,47 @@ class Classifier:
         self.test_size = test_size
         self.cv = cv
         self.method = method
+        self.config_path = config_path
+        self.config = self.load_config()
 
-    def prepare_meta_data(self):
-        #TODO REUSE FUNCTION FROM calculate-buckets
-        meta_ac = pd.read_csv('./data/processed/autochrome_metadata.csv', delimiter='\t')
-        meta_pc = pd.read_csv('./data/processed/photochrome_metadata.csv', delimiter='\t')
+    def load_config(self):
+        """Load configuration from YAML file."""
+        try:
+            with open(self.config_path, 'r') as config_file:
+                return yaml.safe_load(config_file)
+        except FileNotFoundError:
+            print(f"Error: Configuration file not found at {self.config_path}")
+            sys.exit(1)
+        except yaml.YAMLError as e:
+            print(f"Error parsing YAML configuration file: {e}")
+            sys.exit(1)
 
-        meta_ac['location'] = meta_ac['location'].str.lower()
-        meta_pc['location'] = meta_pc['location'].str.lower()
+    # def prepare_meta_data(self):
+    #     #TODO REUSE FUNCTION FROM calculate-buckets
+    #     try:
+    #         meta_ac = pd.read_csv('./data/processed/autochrome_metadata.csv', delimiter='\t')
+    #         meta_pc = pd.read_csv('./data/processed/photochrome_metadata.csv', delimiter='\t')
+    #     except FileNotFoundError as e:
+    #         print(f"Error: Metadata file not found. {e}")
+    #         sys.exit(1)
+    #     except pd.errors.EmptyDataError:
+    #         print("Error: One of the metadata files is empty.")
+    #         sys.exit(1)
+        
+    #     meta_ac['location'] = meta_ac['location'].str.lower()
+    #     meta_pc['location'] = meta_pc['location'].str.lower()
 
-        meta_ac['type'] = 'ac'
-        meta_pc['type'] = 'pc'
+    #     meta_ac['type'] = 'ac'
+    #     meta_pc['type'] = 'pc'
 
-        return pd.concat([meta_ac, meta_pc], axis=0)
+    #     return pd.concat([meta_ac, meta_pc], axis=0)
     
     @staticmethod
     def prepare_model(data):
         cleaned_data, filenames = [], []
         for item in data:
             if item:
+                # Extract percentage data, excluding the 'img' key
                 cleaned_item = {k: v['perc'] for k, v in item.items() if k != 'img'}
                 cleaned_data.append(cleaned_item)
                 filenames.append(item.get('img'))
@@ -150,21 +189,37 @@ class Classifier:
         plt.savefig(self.figures_path / f"{self.method}_summary_plot.png", dpi=300, bbox_inches='tight')
         Classifier.plot_avg_bucket_colors(buckets, self.method, self.figures_path)
 
-    def run(self):
-        with open(self.model_path, 'rb') as f:
-            print(self.model_path)
-            buckets = pickle.load(f)
-
+    def load_buckets(self) -> List[Dict]:
+        """Load bucket data from the model file"""
+        try:
+            with open(self.model_path, 'rb') as f:
+                print(f"Laoding buckets from {self.model_path}")
+                return pickle.load(f)
+        except FileNotFoundError:
+            print(f"Error: Model file not found at {self.model_path}")
+            sys.exit(1)
+        except pickle.PickleError:
+            print(f"Error: Unable to load pickle file at {self.model_path}")
+            sys.exit(1)
+            
+    def process_data(self, buckets: List[Dict]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """"Process bucket data and metadata"""
         meta_data = self.prepare_meta_data()
-
         cleaned_buckets, filenames = self.prepare_model(buckets)
+        
         meta_data = meta_data[meta_data['filename'].isin(filenames)]
         df = pd.DataFrame.from_dict(cleaned_buckets).fillna(0)
         df = df.reindex(sorted(df.columns), axis=1)
-
-        #todo: hardcoded list, give as param
-        occident = ["uk", "germany", "switzerland", "belgium", "italy", "austro-hungary", "scotland"]
-        orient = ['saudi arabia', 'holy land', 'egypt', 'algeria', 'turkey', 'afghanistan', 'iraq', 'syria', 'tunesia', 'israel']
+        df.index = filenames
+        
+        return meta_data, df
+    
+    def filter_data(self, meta_data: pd.DataFrame, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
+        """Filter data based on method and location."""
+        occident = self.config['locations']['occident']
+        orient = self.config['locations']['orient']
+        #occident = ["uk", "germany", "switzerland", "belgium", "italy", "austro-hungary", "scotland"]
+        #orient = ['saudi arabia', 'holy land', 'egypt', 'algeria', 'turkey', 'afghanistan', 'iraq', 'syria', 'tunesia', 'israel']
 
         if self.method == 'all':
             target = ['type', 'ac_pc']
@@ -174,9 +229,17 @@ class Classifier:
             meta_data = meta_data[meta_data['type'] == self.method]
             target = ['origin', self.method]
 
-        df.index = filenames
         selected_files = meta_data['filename'].values
         df = df.loc[selected_files]
+        
+        return meta_data, df, target
+    
+    def run(self):
+        """Execute the classification process."""
+        buckets = self.load_buckets()
+        meta_data, df = self.process_data(buckets)
+        meta_data, df, target = self.filter_data(meta_data, df)
+        
         clf, X_train = self.train_classifier(meta_data, df, target)
         #self.explain_results(clf, X_train, buckets)     
 
@@ -195,6 +258,8 @@ if __name__ == '__main__':
     # method `ac` refers to classifcation between orient and occident in autochrome
     # method `pc` refers to classification between orient and occident in photochrome
     parser.add_argument('--method', type=str, default='all')
+    parser.add_argument('--config_path', type=str, default='./config.yaml',  help='Path to the configuration file')
+    
     args = parser.parse_args()
 
     model_path = Path(args.model_path)
@@ -209,6 +274,7 @@ if __name__ == '__main__':
 
     print(f'Training Classifier: {args.method}, Colors-Buckets {sub_path}')
 
-    classifier = Classifier(model_path, data_path, output_path, figures_path, args.test_size, args.cv, args.method)
+    classifier = Classifier(model_path, data_path, output_path, figures_path, 
+                            args.test_size, args.cv, args.method, args.config_path)
     classifier.run()
     sys.exit()

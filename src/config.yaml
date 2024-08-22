@@ -1,0 +1,23 @@
+# config.yaml
+
+locations:
+  occident:
+    - uk
+    - germany
+    - switzerland
+    - belgium
+    - italy
+    - austro-hungary
+    - scotland
+
+  orient:
+    - saudi arabia
+    - holy land
+    - egypt
+    - algeria
+    - turkey
+    - afghanistan
+    - iraq
+    - syria
+    - tunesia
+    - israel
