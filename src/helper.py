@@ -40,13 +40,24 @@ class ImageProcessing:
         return tuple(map(ColorProcessing.up_scale, hsv_to_rgb(h, s, v)))
     
     @staticmethod
-    def clamp_lab(color: Tuple[int, int, int], min_l: int, max_l: int) -> Tuple[int, int, int]:
+
+    def clamp_lab(color: Tuple[float, float, float], min_l: float, max_l: float) -> Tuple[float, float, float]:
         '''
-        clamp method for cielab color space
+        Clamp method for CIELAB color space
         '''
         l, a, b = color
-        l = max(min(l, max_l), min_l)
-        return (l, a, b)
+        # Normalize L to 0-1 range
+        l_normalized = l / 100.0
+        min_l_normalized = min_l / 100.0
+        max_l_normalized = max_l / 100.0
+        
+        # Clamp normalized L value
+        l_clamped = max(min(l_normalized, max_l_normalized), min_l_normalized)
+        
+        # Convert back to 0-100 range
+        l_final = l_clamped * 100.0
+        
+    return (l_final, a, b)
     
     @staticmethod
     def load_and_convert_image(img_path: str, color_scheme='RGB') -> Tuple[np.array, np.array]:
@@ -219,7 +230,7 @@ class ImageAnalysis:
         ax1 = plt.subplot(gs[0])
         ax1.axis("off")
         ax1.set_title('Original Image')
-        if color_space = 'RGB':
+        if color_space == 'RGB':
             ax1.imshow(converted_img)
         else: #LAB
             # Convert LAB to RGB for Display
@@ -521,7 +532,7 @@ def process_colors(colors: np.array, percentages: np.array, n_pixels_dim: int) -
         result[num_bucket]['color'] += color
     return result
 
-def colorz_in_bucket(data_path: str, x: str, n_colors: int = 16, n_pixels_dim: int = 4, 
+def colorz_in_bucket(data_path: str, x: str, n_colors: int = 16, n_pixels_dim: int = 4, color_space: str,
                      min_v: int = 0, max_v: int = 256, thumb_size: tuple = Constants.THUMB_SIZE, debug: bool = False) -> Dict[str, Any]:
     """
     Get the n most dominant colors of an image and categorize them into buckets.
@@ -530,9 +541,12 @@ def colorz_in_bucket(data_path: str, x: str, n_colors: int = 16, n_pixels_dim: i
         img_path = os.path.join(data_path, x)
         img = Image.open(img_path)
         img.thumbnail(Constants.THUMB_SIZE)
-        colors = ImageProcessing.get_colors(img)
-
-        clamped = [ImageProcessing.clamp(color, min_v, max_v) for color in colors]
+        colors = ImageProcessing.get_colors(img, color_space)
+        if color_space == 'RGB':
+            clamped = [ImageProcessing.clamp(color, min_v, max_v) for color in colors]
+        elif color_space == 'LAB':
+            clamped = [ImageProcessing.clamp_lab(color, min_l, max_l) for color in colors]
+        
         X = np.array(clamped).astype(float)
         clusters = KMeans(n_clusters=n_colors).fit(X)
 

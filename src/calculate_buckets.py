@@ -10,18 +10,28 @@ import sys
 sys.path.insert(0, '../src/')
 from helper import colorz_in_bucket
 
+
 class ColorBuckets:
-    def __init__(self, data_path, meta_data, n_colors, n_pixels_dim, model_path):
+    def __init__(self,
+                 data_path,
+                 meta_data,
+                 n_colors,
+                 n_pixels_dim,
+                 model_path,
+                 color_space):
         self.data_path = data_path
         self.meta_data = meta_data
         self.n_colors = n_colors
         self.n_pixels_dim = n_pixels_dim
         self.model_path = model_path
+        self.color_space = color_space
 
     @staticmethod
     def load_df(meta_data):
-        meta_ac = pd.read_csv(meta_data / 'autochrome_metadata.csv', delimiter='\t')
-        meta_pc = pd.read_csv(meta_data / 'photochrome_metadata.csv', delimiter='\t')
+        meta_ac = pd.read_csv(meta_data / 'autochrome_metadata.csv', 
+                              delimiter='\t')
+        meta_pc = pd.read_csv(meta_data / 'photochrome_metadata.csv', 
+                              delimiter='\t')
 
         meta_ac['location'] = meta_ac['location'].str.lower()
         meta_pc['location'] = meta_pc['location'].str.lower()
@@ -40,14 +50,19 @@ class ColorBuckets:
         for idx, filename in enumerate(meta['filename'], start=1):
             if idx % 100 == 0:
                 print(idx / n_files * 100)
-            buckets.append(colorz_in_bucket(self.data_path, filename, self.n_colors, self.n_pixels_dim))
+            buckets.append(colorz_in_bucket(self.data_path,
+                                            filename,
+                                            self.n_colors,
+                                            self.n_pixels_dim,
+                                            self.color_space))
         
         self.save_buckets(buckets, name='buckets')
 
     def save_buckets(self, buckets, name):
-        model_file_path = self.model_path / f'{name}_{self.n_colors}_{self.n_pixels_dim}.pkl'
+        model_file_path = self.model_path / f'{name}_{self.n_colors}_{self.n_pixels_dim}_{self.color_space}.pkl'
         with model_file_path.open('wb') as f:
             pickle.dump(buckets, f)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -56,6 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_colors', type=int, default=8)
     parser.add_argument('--n_pixels_dim', type=int, default=4)
     parser.add_argument('--model_path', type=str, default='./models/')
+    parser.add_argument('--color_space', type=str, default='RGB') #alternative is LAB
     args = parser.parse_args()
 
     data_path = Path(args.data_path)
@@ -64,6 +80,11 @@ if __name__ == '__main__':
 
     model_path.mkdir(parents=True, exist_ok=True)
 
-    color_bucket = ColorBuckets(data_path, meta_data, args.n_colors, args.n_pixels_dim, model_path)
+    color_bucket = ColorBuckets(data_path,
+                                meta_data,
+                                args.n_colors,
+                                args.n_pixels_dim,
+                                model_path,
+                                args.color_space)
     color_bucket.calculate_buckets()
 
