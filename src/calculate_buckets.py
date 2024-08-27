@@ -61,7 +61,10 @@ class ColorBuckets:
         meta_ac['type'] = 'ac'
         meta_pc['type'] = 'pc'
 
-        return pd.concat([meta_ac, meta_pc], axis=0)
+        combined_df = pd.concat([meta_ac, meta_pc], axis=0)
+        sampled_df = combined_df.sample(n=min(1000, len(combined_df)), random_state=42)
+        return sampled_df
+        
     
     def calculate_buckets(self):
         """Calculate color buckets for all images in the dataset."""
@@ -105,7 +108,7 @@ class ColorBuckets:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process images and calculate color buckets.")
-    parser.add_argument('--data_path', default='../../surfdrive/datasets/Colors/OrientalColorData/images_all')
+    parser.add_argument('--data_path', default='../../ownCloud/datasets/Colors/OrientalColorData/images_all')
     parser.add_argument('--meta_data', default='./data/processed')
     parser.add_argument('--n_colors', type=int, default=8)
     parser.add_argument('--n_pixels_dim', type=int, default=4)

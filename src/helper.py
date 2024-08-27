@@ -64,7 +64,7 @@ class ImageProcessing:
         # Convert back to 0-100 range
         l_final = l_clamped * 100.0
         
-    return (l_final, a, b)
+        return (l_final, a, b)
     
     @staticmethod
     def load_and_convert_image(img_path: str, color_scheme='RGB') -> Tuple[np.array, np.array]:
@@ -416,7 +416,7 @@ class DominantColorAnalysis:
         self.img_list = random.sample(self.img_list, self.n_sample)
 
     def get_image_colors(self) -> np.ndarray:
-              """
+        """
         Extract color information from all sampled images.
 
         This method loads each image, converts it to the specified color space,
@@ -528,7 +528,7 @@ def dominant_color_collection(datapath, img_list, title, output, n_sample, n_col
         img_list = random.sample(img_list, n_sample)
         
     for _ in img_list:
-        image_array = colorz_in_bucket(_, n_colors, cluster=False, color_space)
+        image_array = colorz_in_bucket(_, n_colors, color_space, cluster=False)
         allArrays.append(image_array)
 
 

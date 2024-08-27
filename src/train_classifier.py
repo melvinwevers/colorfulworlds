@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, '../src/')
 from helper import *
-from calculate_buckets import prepare_meta_data
+from calculate_buckets import ColorBuckets
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
@@ -24,13 +24,14 @@ from typing import Dict, Any
 
 class Classifier:
     """A class for training and evaluating image classification models."""
-    def __init__(self, model_path, data_path, output_path, figures_path, test_size, cv, method, config_path):
+    def __init__(self, model_path, data_path, meta_data, output_path, figures_path, test_size, cv, method, config_path):
         """
         Initialize the Classifier.
 
         Args:
             model_path (str): Path to the model file.
             data_path (str): Path to the data directory.
+            meta_data (str): Path to the metadata.
             output_path (str): Path to save output files.
             figures_path (str): Path to save figure files.
             test_size (float): Proportion of the dataset to include in the test split.
@@ -40,6 +41,7 @@ class Classifier:
         """
         self.model_path = model_path
         self.data_path = data_path
+        self.meta_data = meta_data
         self.output_path = output_path
         self.figures_path = figures_path
         self.test_size = test_size
@@ -204,7 +206,7 @@ class Classifier:
             
     def process_data(self, buckets: List[Dict]) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """"Process bucket data and metadata"""
-        meta_data = self.prepare_meta_data()
+        meta_data = ColorBuckets.load_df(Path(self.meta_data))
         cleaned_buckets, filenames = self.prepare_model(buckets)
         
         meta_data = meta_data[meta_data['filename'].isin(filenames)]
@@ -237,11 +239,12 @@ class Classifier:
     def run(self):
         """Execute the classification process."""
         buckets = self.load_buckets()
+        print(buckets)
         meta_data, df = self.process_data(buckets)
         meta_data, df, target = self.filter_data(meta_data, df)
         
         clf, X_train = self.train_classifier(meta_data, df, target)
-        #self.explain_results(clf, X_train, buckets)     
+        self.explain_results(clf, X_train, buckets)     
 
     
 if __name__ == '__main__':
@@ -250,6 +253,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default='./models/buckets_16_8.pkl')
     parser.add_argument('--data_path', default='~/work/surfdrive/datasets/Colors/OrientalColorData/')
+    parser.add_argument('--meta_data', default='./data/processed')
     parser.add_argument('--output_path', type=str, default='./models/')
     parser.add_argument('--figures_path', type=str, default='./figures/')
     parser.add_argument('--test_size', type=int, default=0.2)
@@ -274,7 +278,7 @@ if __name__ == '__main__':
 
     print(f'Training Classifier: {args.method}, Colors-Buckets {sub_path}')
 
-    classifier = Classifier(model_path, data_path, output_path, figures_path, 
+    classifier = Classifier(model_path, data_path, args.meta_data, output_path, figures_path, 
                             args.test_size, args.cv, args.method, args.config_path)
     classifier.run()
     sys.exit()
