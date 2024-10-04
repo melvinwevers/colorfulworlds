@@ -1,25 +1,89 @@
-# Clash of Colorful Worlds Code
-In the late nineteenth century, the visual representation of the Orient was characterized not only by specific content, such as harems, camels, and deserts, but also by an ``Orientalist aesthetic'', in which the use of color played a crucial role. However, technological limitations and material constraints constrained which colors artists could use. This study examines the influence of color and materiality on geographic imaginaries by analyzing two collections of late-nineteenth-century color(ed) pictures. The collections consist of two types of images: photochromes, which were colorized by printers, and autochromes, where color was derived from light. By training random-forest classification algorithms with dominant colors exrtracted from these digitized images, we aim to differentiate between (1) photochromes and autochromes; (2) photochromes depicting the Orient and the Occident; and (3) autochromes portraying the Orient and the Occident. To interpret the classifier's output, we employ SHAP (SHapley Additive exPlanations) and discover that the classifier effectively distinguishes between the two worlds in the photochrome collection but underperforms for the autochromes. This observation leads to three interconnected conclusions: (1) the presence and absence of color were vital aspects of visual Orientalism; (2) color use became mediated and constrained by material conditions during the late-nineteenth century; and (3) dominant colors serve as an interpretive feature for distinguishing geographic imaginaries. Traditional analyses of visual materials often focus on specific objects or associated colors, thereby neglecting the absence of dominant colors. Our approach allows scholars to consider both the presence and absence of dominant colors, enabling a more comprehensive understanding of the visual landscape without being distracted by individual objects.
+# Coloring in the World of Others
 
-## Data
-The folder data contains the cropped versions of the images. 
-For the harvesting and processing of the data see the notebooks: 
+## Project Overview
 
-## Models
-Contains pickles for the prepared buckets and the classifiers.
+This project examines the influence of color and materiality on geographic imaginaries in late nineteenth-century visual representations of the Orient. We analyze two collections of color(ed) pictures: photochromes (colorized by printers) and autochromes (color derived from light).
 
-## Figures
-Contains the Figures
+Our study employs machine learning techniques to differentiate between:
+1. Photochromes and autochromes
+2. Photochromes depicting the Orient and the Occident
+3. Autochromes portraying the Orient and the Occident
 
-## Manuscript
-Contains the paper manuscript
+By using random-forest classification algorithms and SHAP (SHapley Additive exPlanations) for interpretation, we aim to uncover insights into the role of color in visual Orientalism and its mediation through material conditions.
 
-## Code
-- `run_calculating_buckets.sh` fires up `src/calculatebuckets.py`to extract the dominant colors from the images and places them into RGB buckets.
-- `run_classification.sh` uses `src/train_classifier.py` to train a random forest classifier using the buckets as features. The script also applies SHAP explainer to produce plots for interpretability. 
-- `notebooks/run_descriptive_analysis.ipynb` provides basic functions to explore the collections. 
+## Repository Structure
+
+- `data/`: Contains cropped versions of the images used in the study.
+- `models/`: Includes pickles for the prepared buckets and classifiers.
+- `figures/`: Contains generated figures and visualizations.
+- `src/`: Source code for data processing and analysis.
+- `notebooks/`: Jupyter notebooks for data exploration and analysis.
+
+## Data and Model Availability
+The models and images used in this project can be downloaded from [Zenodo](https://zenodo.org/records/13888782)
+
+Please download these files and place them in the appropriate directories (data/ for images and models/ for model files) before running the analysis scripts.
+
+## Key Findings
+
+Our analysis reveals three interconnected conclusions:
+1. The presence and absence of color were vital aspects of visual Orientalism.
+2. Color use became mediated and constrained by material conditions during the late-nineteenth century.
+3. Dominant colors serve as an interpretive feature for distinguishing geographic imaginaries.
+
+## Methodology
+
+1. **Data Collection**: For details on data harvesting and processing, refer to the notebooks in the `notebooks/` directory.
+2. **Color Extraction**: We extract dominant colors from images and place them into RGB buckets using `src/calculatebuckets.py`.
+3. **Classification**: A random forest classifier is trained using the color buckets as features (`src/train_classifier.py`).
+4. **Interpretation**: SHAP explainer is applied to produce interpretability plots.
+
+## Usage
+
+1. **Extract Dominant Colors**:
+   ```
+   ./run_calculating_buckets.sh
+   ```
+
+2. **Train Classifier and Generate SHAP Plots**:
+   ```
+   ./run_classification.sh
+   ```
+
+3. **Exploratory Data Analysis**:
+   Open and run `notebooks/run_descriptive_analysis.ipynb` for basic functions to explore the collections.
 
 ## Requirements
-Test on Python 3.7.11. 
-For specific libraries see `requirements.txt`
 
+- Python 3.7.11
+- For specific library dependencies, see `requirements.txt`
+
+## Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/melvin/colorfulworlds.git
+   cd colorfulworlds
+   ```
+
+2. Create a virtual environment (optional but recommended):
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   ```
+
+3. Install the required packages:
+   ```
+   pip install -r requirements.txt
+   ```
+
+
+## Contact
+
+- Thomas Smits (t.p.smits(at)uva.nl)
+- Melvin Wevers (melvin.wevers(at)uva.nl)
+
+## Acknowledgments
+
+- We would like to thank Mike Kestemont for his feedback on an early draft.
+- We would also like the Albert Kahn Museum for making their collection available in digitized form. 
