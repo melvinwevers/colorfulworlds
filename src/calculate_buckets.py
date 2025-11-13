@@ -62,8 +62,8 @@ class ColorBuckets:
         meta_pc['type'] = 'pc'
 
         combined_df = pd.concat([meta_ac, meta_pc], axis=0)
-        sampled_df = combined_df.sample(n=min(1000, len(combined_df)), random_state=42)
-        return sampled_df
+        #sampled_df = combined_df.sample(n=min(1000, len(combined_df)), random_state=42)
+        return combined_df
         
     
     def calculate_buckets(self):
